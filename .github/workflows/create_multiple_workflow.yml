@@ -1,4 +1,4 @@
-name: Create Multiple Repositories on settings.json Change (Windows)
+name: Create Multiple Repositories on settings.json Change (Windows, curl)
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
           }
           echo "repo_names=$repoNames" >> $env:GITHUB_OUTPUT
 
-      - name: Create repositories via API
+      - name: Create repositories via API (curl)
         if: steps.find_settings.outputs.found == 'true'
         shell: pwsh
         env:
@@ -49,8 +49,10 @@ jobs:
           foreach ($name in $names) {
             $trimmed = $name.Trim()
             Write-Host "Creating repository: $trimmed"
-            $body = @{ name = $trimmed; private = $false } | ConvertTo-Json -Compress
-            Invoke-RestMethod -Uri "https://api.github.com/orgs/$env:ORG/repos" `
-              -Headers @{ Authorization = "token $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" } `
-              -Method Post -Body $body
+            $json = "{`"name`":`"$trimmed`",`"private`":false}"
+            curl -X POST `
+              -H "Authorization: token $env:GITHUB_TOKEN" `
+              -H "Accept: application/vnd.github+json" `
+              -d $json `
+              "https://api.github.com/orgs/$env:ORG/repos"
           }
