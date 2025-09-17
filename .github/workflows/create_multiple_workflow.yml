@@ -1,0 +1,56 @@
+name: Create Multiple Repositories on settings.json Change (Windows)
+
+on:
+  push:
+    paths:
+      - '**/settings.json'
+
+jobs:
+  create_repos:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find settings.json
+        id: find_settings
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path . -Filter settings.json -Recurse | Select-Object -First 1
+          if ($null -eq $file) {
+            echo "found=false" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "found=true" >> $env:GITHUB_OUTPUT
+            echo "file_path=$($file.FullName)" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Read repo names from settings.json
+        id: read_repo_names
+        if: steps.find_settings.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          $json = Get-Content "${{ steps.find_settings.outputs.file_path }}" | ConvertFrom-Json
+          $repoNames = $json.repo_names
+          if ([string]::IsNullOrEmpty($repoNames)) {
+            Write-Host "No repo_names found in settings.json"
+            exit 1
+          }
+          echo "repo_names=$repoNames" >> $env:GITHUB_OUTPUT
+
+      - name: Create repositories via API
+        if: steps.find_settings.outputs.found == 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+          REPO_NAMES: ${{ steps.read_repo_names.outputs.repo_names }}
+        run: |
+          $names = $env:REPO_NAMES -split ','
+          foreach ($name in $names) {
+            $trimmed = $name.Trim()
+            Write-Host "Creating repository: $trimmed"
+            $body = @{ name = $trimmed; private = $false } | ConvertTo-Json -Compress
+            Invoke-RestMethod -Uri "https://api.github.com/orgs/$env:ORG/repos" `
+              -Headers @{ Authorization = "token $env:GITHUB_TOKEN"; Accept = "application/vnd.github+json" } `
+              -Method Post -Body $body
+          }
