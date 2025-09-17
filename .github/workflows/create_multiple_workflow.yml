@@ -42,7 +42,6 @@ jobs:
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-          ORG: ${{ github.repository_owner }}
           REPO_NAMES: ${{ steps.read_repo_names.outputs.repo_names }}
         run: |
           $names = $env:REPO_NAMES -split ','
@@ -54,5 +53,5 @@ jobs:
               -H "Authorization: token $env:GITHUB_TOKEN" `
               -H "Accept: application/vnd.github+json" `
               -d $json `
-              "https://api.github.com/orgs/$env:ORG/repos"
+              "https://api.github.com/user/repos"
           }
